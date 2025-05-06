@@ -128,4 +128,4 @@ _No scheduled content – use this week for mid-term review or self-study!_
 
 1. **Clone this repo**  
    ```bash
-   git clone [https://github.com/melhzy/data-analytics-pygame.git](https://github.com/melhzy/data_analytics.git)
+   git clone https://github.com/melhzy/data_analytics.git
