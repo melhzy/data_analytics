@@ -92,7 +92,7 @@ slider_mean1 = {"pos": (0, 0), "width": 200, "value": mean1, "min": 70, "max": 1
 slider_std1 = {"pos": (0, 0), "width": 200, "value": std1, "min": 5, "max": 25, "dragging": False}
 slider_mean2 = {"pos": (0, 0), "width": 200, "value": mean2, "min": 70, "max": 130, "dragging": False}
 slider_std2 = {"pos": (0, 0), "width": 200, "value": std2, "min": 5, "max": 25, "dragging": False}
-slider_sample = {"pos": (0, 0), "width": 250, "value": sample_size, "min": 5, "max": 200, "dragging": False}
+slider_sample = {"pos": (0, 0), "width": 250, "value": sample_size, "min": 5, "max": 20000, "dragging": False}
 
 # Initialize buttons with empty Rects
 calc_button = pygame.Rect(0, 0, 0, 0)
@@ -282,7 +282,7 @@ def calculate_layout():
         "width": sample_grid['slider_width'],
         "value": slider_sample["value"],
         "min": 5,
-        "max": 200,
+        "max": 20000,
         "dragging": slider_sample["dragging"]
     }
     
