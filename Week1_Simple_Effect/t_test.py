@@ -106,6 +106,8 @@ group2 = np.random.normal(mean2, std2, sample_size)
 # T-test results
 t_stat = 0
 p_value = 0
+cohens_d = 0    # Added for effect size
+hedges_g = 0    # Added for effect size
 has_calculated = False
 
 # Tutorial pages
@@ -641,6 +643,29 @@ def draw_tutorial():
         
         for i, line in enumerate(tutorial_text):
             draw_text(line, font_medium, BLACK, WIDTH // 2, 180 + i * 40, "center")
+            
+    elif tutorial_page == 5:
+        # Effect size explanation
+        draw_text("Understanding Effect Sizes", font_large, BLACK, WIDTH // 2, 120, "center")
+        
+        tutorial_text = [
+            "Effect size measures the magnitude of the difference between groups,",
+            "regardless of statistical significance.",
+            "",
+            "In this simulation, we use:",
+            "• Cohen's d: The standardized difference between two means",
+            "• Hedges' g: A variation of Cohen's d corrected for small samples",
+            "",
+            "Interpretation guidelines:",
+            "• d/g ≈ 0.2: Small effect",
+            "• d/g ≈ 0.5: Medium effect",
+            "• d/g ≈ 0.8: Large effect",
+            "",
+            "In Alzheimer's research, even small effect sizes can be clinically meaningful!"
+        ]
+        
+        for i, line in enumerate(tutorial_text):
+            draw_text(line, font_medium, BLACK, WIDTH // 2, 180 + i * 40, "center")
     
     # Navigation buttons
     back_button = pygame.Rect(50, HEIGHT - 100, 200, 50)
@@ -736,16 +761,23 @@ def draw_game(layout, mouse_pos):
         )
         draw_panel(result_panel, result_panel_color, border_radius=5, border_color=DARK_GRAY, border_width=1)
         
-        # Draw results with proper spacing and division into thirds
+        # Draw results with proper spacing into quarters (expanded to accommodate effect sizes)
         panel_width = layout["results"]["width"]
+        
+        # t-statistic in first quarter
         t_pos_x = result_panel.left + 10
-        draw_text(f"t-statistic: {t_stat:.3f}", font_result, BLACK, t_pos_x, result_panel.centery)
+        draw_text(f"t: {t_stat:.3f}", font_result, BLACK, t_pos_x, result_panel.centery)
         
-        p_pos_x = result_panel.left + panel_width // 3
-        draw_text(f"p-value: {p_value:.4f}", font_result, BLACK, p_pos_x, result_panel.centery)
+        # p-value in second quarter
+        p_pos_x = result_panel.left + panel_width // 4
+        draw_text(f"p: {p_value:.4f}", font_result, BLACK, p_pos_x, result_panel.centery)
         
-        # Draw significance result - right aligned
-        draw_text(result_text, font_result, result_text_color, result_panel.right - 10, result_panel.centery, "right")
+        # Effect sizes in third quarter
+        d_pos_x = result_panel.left + 2 * panel_width // 4
+        draw_text(f"d: {cohens_d:.2f}, g: {hedges_g:.2f}", font_result, BLACK, d_pos_x, result_panel.centery)
+        
+        # Draw significance result in fourth quarter - right aligned
+        draw_text(result_text, font_result, result_text_color, result_panel.right, result_panel.centery, "right")
     
     # Create and draw histogram in its own panel with proper padding
     chart_rect = pygame.Rect(
@@ -787,7 +819,7 @@ def draw_game(layout, mouse_pos):
             layout["instructions"]["height"]
         )
         draw_panel(instruction_panel, PANEL_YELLOW, border_color=DARK_GRAY, border_width=1)
-        instruction_text = "Adjust the sliders to see their impact on the t-test and aim for p < 0.05."
+        instruction_text = "Adjust the sliders to see their impact on the t-test, effect sizes, and aim for p < 0.05."
         
         # Center the text in the instruction panel
         draw_text(instruction_text, font_medium, BLACK, instruction_panel.centerx, instruction_panel.centery, "center")
@@ -897,8 +929,8 @@ def reset_data():
         has_calculated = False
 
 def calculate_ttest():
-    """Calculate t-test on current data"""
-    global t_stat, p_value, has_calculated
+    """Calculate t-test and effect sizes on current data"""
+    global t_stat, p_value, cohens_d, hedges_g, has_calculated
     
     try:
         debug_info(f"Calculating t-test: group1 size={len(group1)}, group2 size={len(group2)}")
@@ -907,6 +939,8 @@ def calculate_ttest():
         if len(group1) < 2 or len(group2) < 2:
             t_stat = 0
             p_value = 1.0
+            cohens_d = 0
+            hedges_g = 0
             debug_info(f"Not enough data for t-test. Using defaults.")
         else:
             # Perform independent t-test
@@ -915,21 +949,83 @@ def calculate_ttest():
             # Take absolute value of t-stat for simpler interpretation
             t_stat = abs(t_stat)
             
+            # Calculate effect sizes
+            cohens_d = calculate_cohens_d(group1, group2)
+            hedges_g = calculate_hedges_g(group1, group2)
+            
             # Check for invalid results
-            if np.isnan(t_stat) or np.isnan(p_value):
+            if np.isnan(t_stat) or np.isnan(p_value) or np.isnan(cohens_d) or np.isnan(hedges_g):
                 t_stat = 0
                 p_value = 1.0
-                debug_info("Warning: NaN values detected in t-test results. Using default values.")
+                cohens_d = 0
+                hedges_g = 0
+                debug_info("Warning: NaN values detected in test results. Using default values.")
         
         has_calculated = True
-        debug_info(f"T-test results: t={t_stat:.4f}, p={p_value:.4f}")
+        debug_info(f"T-test results: t={t_stat:.4f}, p={p_value:.4f}, Cohen's d={cohens_d:.4f}, Hedges' g={hedges_g:.4f}")
     except Exception as e:
         # Handle any errors during calculation
         t_stat = 0
         p_value = 1.0
+        cohens_d = 0
+        hedges_g = 0
         has_calculated = True
         print(f"Error calculating t-test: {e}")
         print(traceback.format_exc())
+
+# Add these effect size calculation functions after the calculate_ttest function
+def calculate_cohens_d(group1, group2):
+    """
+    Calculate Cohen's d effect size for two independent samples.
+    
+    Formula: d = (mean2 - mean1) / pooled_std
+    where pooled_std = sqrt((std1² + std2²) / 2)
+    
+    Interpretation:
+    0.2 = small effect
+    0.5 = medium effect
+    0.8 = large effect
+    """
+    mean1, mean2 = np.mean(group1), np.mean(group2)
+    std1, std2 = np.std(group1, ddof=1), np.std(group2, ddof=1)
+    
+    # Calculate pooled standard deviation
+    pooled_std = np.sqrt((std1**2 + std2**2) / 2)
+    
+    # Prevent division by zero
+    if pooled_std == 0:
+        return 0
+        
+    # Calculate Cohen's d
+    d = abs(mean2 - mean1) / pooled_std
+    return d
+
+def calculate_hedges_g(group1, group2):
+    """
+    Calculate Hedges' g effect size, which is a variation of Cohen's d
+    that corrects for bias in small samples.
+    
+    Formula: g = J * d
+    where J is a correction factor for small sample sizes
+    and d is Cohen's d.
+    
+    Interpretation is similar to Cohen's d.
+    """
+    n1, n2 = len(group1), len(group2)
+    
+    # Calculate Cohen's d first
+    d = calculate_cohens_d(group1, group2)
+    
+    # Calculate correction factor J
+    # J ≈ 1 - 3/(4*(n1 + n2 - 2) - 1)
+    if n1 + n2 - 2 <= 1:  # Prevent division by zero or negative
+        return d
+        
+    J = 1 - (3 / (4 * (n1 + n2 - 2) - 1))
+    
+    # Calculate Hedges' g
+    g = J * d
+    return g
 
 # Initialize layout at startup
 layout = calculate_layout()
